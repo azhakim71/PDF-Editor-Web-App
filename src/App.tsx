@@ -18,28 +18,9 @@ function App() {
     setIsEditing(false);
   };
 
-  const handleDownload = async () => {
-    if (!pdfDocument?.pdfLibDoc || typeof window === 'undefined') return;
-    
-    try {
-      const pdfBlob = await pdfDocument.pdfLibDoc.save();
-      const url = window.URL.createObjectURL(new Blob([pdfBlob]));
-      const link = window.document.createElement('a');
-      link.href = url;
-      link.download = `edited_${pdfDocument.name}`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading PDF:', error);
-    }
-  };
-
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
-      <Header 
-        onDownload={handleDownload}
-        canDownload={isEditing && !!pdfDocument}
-      />
+      <Header />
       
       <main className="flex-grow p-4 md:p-6 container mx-auto max-w-7xl">
         {isEditing && pdfDocument ? (

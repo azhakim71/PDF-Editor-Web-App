@@ -5,7 +5,7 @@ import {
   Type, 
   Highlighter, 
   FileSpreadsheet, 
-  FileDown, 
+  Download, 
   Minimize 
 } from 'lucide-react';
 import { PDFDocument, EditorTool, ToolbarItem } from '../types';
@@ -98,24 +98,20 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
     }
   };
 
-  const handleSavePDF = async () => {
+  const handleDownload = async () => {
     if (!document.pdfLibDoc || typeof window === 'undefined') return;
     
     try {
       setIsSaving(true);
-      const pdfBlob = await savePDF(document);
-      
-      // Create download link
-      const url = window.URL.createObjectURL(pdfBlob);
-      const link = window.document.createElement('a');
+      const pdfBlob = await document.pdfLibDoc.save();
+      const url = window.URL.createObjectURL(new Blob([pdfBlob]));
+      const link = document.createElement('a');
       link.href = url;
       link.download = `edited_${document.name}`;
       link.click();
-      
-      // Clean up
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error saving PDF:', error);
+      console.error('Error downloading PDF:', error);
     } finally {
       setIsSaving(false);
     }
@@ -177,20 +173,14 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
             </p>
           </div>
           
-          <div className="flex gap-2">
-            <button
-              onClick={handleSavePDF}
-              disabled={isSaving}
-              className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
-            >
-              {isSaving ? (
-                <div className="animate-spin h-4 w-4 border-2 border-t-transparent border-white rounded-full mr-1"></div>
-              ) : (
-                <FileDown size={16} />
-              )}
-              <span>Save PDF</span>
-            </button>
-          </div>
+          <button
+            onClick={handleDownload}
+            disabled={isSaving}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:bg-blue-400"
+          >
+            <Download size={20} />
+            {isSaving ? 'Downloading...' : 'Download Edited PDF'}
+          </button>
         </div>
       </div>
       
