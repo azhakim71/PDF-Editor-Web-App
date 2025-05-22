@@ -99,24 +99,23 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
   };
 
   const handleDownload = async () => {
-    if (!document.pdfLibDoc || typeof window === 'undefined') return;
-    
     try {
       setIsSaving(true);
-      const url = window.URL.createObjectURL(await savePDF(document));
+      const pdfBlob = await savePDF(document);
       
-      // Check if we're in a browser environment and have access to document.createElement
-      if (typeof document !== 'undefined' && typeof document.createElement === 'function') {
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `edited_${document.name}`;
-        link.click();
-      }
-
-      // Clean up the URL object if the browser environment supports it
-      if (typeof window !== 'undefined' && typeof window.URL.revokeObjectURL === 'function') {
-        window.URL.revokeObjectURL(url);
-      }
+      // Create a temporary URL for the blob
+      const url = URL.createObjectURL(pdfBlob);
+      
+      // Create and trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `edited_${document.name}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Clean up the URL
+      URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading PDF:', error);
     } finally {
