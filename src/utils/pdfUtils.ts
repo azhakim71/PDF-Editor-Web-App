@@ -1,6 +1,7 @@
 import { PDFDocument as PDFLibDocument } from 'pdf-lib';
 import { getDocument, PDFDocumentProxy } from 'pdfjs-dist';
 import { PDFDocument, CompressionSettings } from '../types';
+import { fabric } from 'fabric';
 
 // Read and prepare PDF document
 export const readPdfDocument = async (file: File): Promise<PDFDocument> => {
@@ -54,14 +55,46 @@ export const compressPDF = async (
   return clonedDoc;
 };
 
-// Save the edited PDF
-export const savePDF = async (pdfDocument: PDFDocument): Promise<Blob> => {
-  if (!pdfDocument.pdfLibDoc) {
-    throw new Error('PDF document not loaded correctly');
+// Save the edited PDF with all canvas modifications
+export const savePDF = async (pdfDocument: PDFDocument, fabricCanvas: fabric.Canvas | null): Promise<Blob> => {
+  if (!pdfDocument.pdfLibDoc || !fabricCanvas) {
+    throw new Error('PDF document or canvas not available');
   }
-  
-  const pdfBytes = await pdfDocument.pdfLibDoc.save();
-  return new Blob([pdfBytes], { type: 'application/pdf' });
+
+  try {
+    // Get the canvas as a data URL
+    const canvasDataUrl = fabricCanvas.toDataURL({
+      format: 'png',
+      quality: 1
+    });
+
+    // Convert data URL to Uint8Array
+    const base64Data = canvasDataUrl.split(',')[1];
+    const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+
+    // Embed the image into the PDF
+    const pdfDoc = pdfDocument.pdfLibDoc;
+    const page = pdfDoc.getPages()[0]; // For now, we're handling the first page
+    const image = await pdfDoc.embedPng(imageBytes);
+
+    // Get page dimensions
+    const { width, height } = page.getSize();
+
+    // Draw the image on the page, preserving aspect ratio
+    page.drawImage(image, {
+      x: 0,
+      y: 0,
+      width,
+      height,
+    });
+
+    // Save the modified PDF
+    const pdfBytes = await pdfDoc.save();
+    return new Blob([pdfBytes], { type: 'application/pdf' });
+  } catch (error) {
+    console.error('Error saving PDF:', error);
+    throw error;
+  }
 };
 
 // Get a page as canvas element (for editing)

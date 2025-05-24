@@ -99,14 +99,14 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
   };
 
   const handleDownload = async () => {
-    if (typeof window === 'undefined' || !document) {
+    if (typeof window === 'undefined' || !window.document) {
       console.error('Cannot download PDF in this environment');
       return;
     }
 
     try {
       setIsSaving(true);
-      const pdfBlob = await savePDF(document);
+      const pdfBlob = await savePDF(document, fabricCanvasRef.current);
       
       // Create a temporary URL for the blob
       const url = window.URL.createObjectURL(pdfBlob);
