@@ -99,23 +99,28 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
   };
 
   const handleDownload = async () => {
+    if (typeof window === 'undefined' || !document) {
+      console.error('Cannot download PDF in this environment');
+      return;
+    }
+
     try {
       setIsSaving(true);
       const pdfBlob = await savePDF(document);
       
       // Create a temporary URL for the blob
-      const url = URL.createObjectURL(pdfBlob);
+      const url = window.URL.createObjectURL(pdfBlob);
       
       // Create and trigger download
-      const link = document.createElement('a');
+      const link = window.document.createElement('a');
       link.href = url;
       link.download = `edited_${document.name}`;
-      document.body.appendChild(link);
+      window.document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
+      window.document.body.removeChild(link);
       
       // Clean up the URL
-      URL.revokeObjectURL(url);
+      window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading PDF:', error);
     } finally {
