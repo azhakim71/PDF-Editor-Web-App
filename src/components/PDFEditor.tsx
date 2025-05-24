@@ -6,7 +6,8 @@ import {
   Highlighter, 
   FileSpreadsheet, 
   Download, 
-  Minimize 
+  Minimize,
+  Save
 } from 'lucide-react';
 import { PDFDocument, EditorTool, ToolbarItem } from '../types';
 import { renderPageToCanvas, savePDF } from '../utils/pdfUtils';
@@ -27,6 +28,7 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
   const [activeTool, setActiveTool] = useState<EditorTool>(null);
   const [scale, setScale] = useState(1.0);
   const [isSaving, setIsSaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
@@ -48,6 +50,11 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
       // Initialize fabric.js canvas
       if (!fabricCanvasRef.current) {
         fabricCanvasRef.current = new fabric.Canvas(canvasRef.current);
+        
+        // Listen for canvas modifications
+        fabricCanvasRef.current.on('object:modified', () => setHasUnsavedChanges(true));
+        fabricCanvasRef.current.on('object:added', () => setHasUnsavedChanges(true));
+        fabricCanvasRef.current.on('object:removed', () => setHasUnsavedChanges(true));
       }
       
       await renderCurrentPage();
@@ -106,7 +113,7 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
 
     try {
       setIsSaving(true);
-      const pdfBlob = await savePDF(document, fabricCanvasRef.current);
+      const pdfBlob = await savePDF(document, fabricCanvasRef.current, currentPage);
       
       // Create a temporary URL for the blob
       const url = window.URL.createObjectURL(pdfBlob);
@@ -121,8 +128,21 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
       
       // Clean up the URL
       window.URL.revokeObjectURL(url);
+      setHasUnsavedChanges(false);
     } catch (error) {
       console.error('Error downloading PDF:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      await savePDF(document, fabricCanvasRef.current, currentPage);
+      setHasUnsavedChanges(false);
+    } catch (error) {
+      console.error('Error saving PDF:', error);
     } finally {
       setIsSaving(false);
     }
@@ -184,14 +204,25 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
             </p>
           </div>
           
-          <button
-            onClick={handleDownload}
-            disabled={isSaving}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:bg-blue-400"
-          >
-            <Download size={20} />
-            {isSaving ? 'Downloading...' : 'Download Edited PDF'}
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !hasUnsavedChanges}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors disabled:bg-gray-400"
+            >
+              <Save size={20} />
+              {isSaving ? 'Saving...' : 'Save'}
+            </button>
+            
+            <button
+              onClick={handleDownload}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors disabled:bg-blue-400"
+            >
+              <Download size={20} />
+              {isSaving ? 'Downloading...' : 'Download PDF'}
+            </button>
+          </div>
         </div>
       </div>
       

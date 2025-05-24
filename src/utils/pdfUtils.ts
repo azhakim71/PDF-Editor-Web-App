@@ -56,16 +56,22 @@ export const compressPDF = async (
 };
 
 // Save the edited PDF with all canvas modifications
-export const savePDF = async (pdfDocument: PDFDocument, fabricCanvas: fabric.Canvas | null): Promise<Blob> => {
+export const savePDF = async (
+  pdfDocument: PDFDocument, 
+  fabricCanvas: fabric.Canvas | null,
+  currentPage: number
+): Promise<Blob> => {
   if (!pdfDocument.pdfLibDoc || !fabricCanvas) {
     throw new Error('PDF document or canvas not available');
   }
 
   try {
-    // Get the canvas as a data URL
+    // Get the canvas as a high-resolution PNG
+    const scaleFactor = 2; // Increase resolution
     const canvasDataUrl = fabricCanvas.toDataURL({
       format: 'png',
-      quality: 1
+      quality: 1,
+      multiplier: scaleFactor
     });
 
     // Convert data URL to Uint8Array
@@ -74,22 +80,28 @@ export const savePDF = async (pdfDocument: PDFDocument, fabricCanvas: fabric.Can
 
     // Embed the image into the PDF
     const pdfDoc = pdfDocument.pdfLibDoc;
-    const page = pdfDoc.getPages()[0]; // For now, we're handling the first page
+    const page = pdfDoc.getPages()[currentPage - 1];
     const image = await pdfDoc.embedPng(imageBytes);
 
     // Get page dimensions
     const { width, height } = page.getSize();
 
-    // Draw the image on the page, preserving aspect ratio
+    // Draw the image on the page, preserving aspect ratio and maintaining quality
     page.drawImage(image, {
       x: 0,
       y: 0,
       width,
       height,
+      opacity: 1,
     });
 
-    // Save the modified PDF
-    const pdfBytes = await pdfDoc.save();
+    // Save the modified PDF with maximum quality
+    const pdfBytes = await pdfDoc.save({
+      useObjectStreams: false,
+      addDefaultPage: false,
+      objectsPerTick: 50,
+    });
+
     return new Blob([pdfBytes], { type: 'application/pdf' });
   } catch (error) {
     console.error('Error saving PDF:', error);
@@ -104,16 +116,21 @@ export const renderPageToCanvas = async (
   scale: number = 1.5
 ): Promise<HTMLCanvasElement> => {
   const page = await pdfJsDoc.getPage(pageNumber);
-  const viewport = page.getViewport({ scale });
+  const viewport = page.getViewport({ scale: scale * 2 }); // Double the resolution
   
   const canvas = document.createElement('canvas');
-  const context = canvas.getContext('2d')!;
+  const context = canvas.getContext('2d', { alpha: false })!;
   canvas.width = viewport.width;
   canvas.height = viewport.height;
+  
+  // Set high-quality rendering
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
   
   await page.render({
     canvasContext: context,
     viewport,
+    intent: 'print', // Use print intent for higher quality
   }).promise;
   
   return canvas;
