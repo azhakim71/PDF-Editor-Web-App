@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { fabric } from 'fabric';
 import { PDFDocument } from '../../types';
 import { hasForms } from '../../utils/pdfUtils';
 import { Plus, Trash2, Save } from 'lucide-react';
 
 interface FormToolProps {
   document: PDFDocument;
+  canvas: fabric.Canvas;
 }
 
 interface FormField {
@@ -12,18 +14,17 @@ interface FormField {
   type: 'text' | 'checkbox' | 'radio' | 'dropdown';
   name: string;
   value: string;
-  options?: string[]; // For dropdown and radio
+  options?: string[];
   required?: boolean;
   placeholder?: string;
 }
 
-const FormTool: React.FC<FormToolProps> = ({ document }) => {
+const FormTool: React.FC<FormToolProps> = ({ document, canvas }) => {
   const [hasFormFields, setHasFormFields] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [formFields, setFormFields] = useState<FormField[]>([]);
   const [showCreator, setShowCreator] = useState(false);
   
-  // New form field state
   const [newField, setNewField] = useState<FormField>({
     id: '',
     type: 'text',
@@ -32,7 +33,7 @@ const FormTool: React.FC<FormToolProps> = ({ document }) => {
     required: false,
     placeholder: '',
   });
-  
+
   useEffect(() => {
     const checkForms = async () => {
       if (!document.pdfJsDoc) return;
@@ -51,12 +52,78 @@ const FormTool: React.FC<FormToolProps> = ({ document }) => {
     checkForms();
   }, [document]);
 
-  const handleFieldChange = (id: string, value: string) => {
-    setFormFields(prev => 
-      prev.map(field => 
-        field.id === id ? { ...field, value } : field
-      )
-    );
+  const addFormFieldToCanvas = (field: FormField) => {
+    let formElement;
+    
+    switch (field.type) {
+      case 'text':
+        formElement = new fabric.Textbox('Text Field', {
+          width: 200,
+          height: 40,
+          fill: '#000000',
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          hasControls: true,
+          borderColor: '#2196F3',
+          cornerColor: '#2196F3',
+          padding: 10,
+          data: { ...field }
+        });
+        break;
+        
+      case 'checkbox':
+        formElement = new fabric.Rect({
+          width: 20,
+          height: 20,
+          fill: 'rgba(255, 255, 255, 0.8)',
+          stroke: '#000000',
+          strokeWidth: 1,
+          hasControls: true,
+          borderColor: '#2196F3',
+          cornerColor: '#2196F3',
+          data: { ...field }
+        });
+        break;
+        
+      case 'radio':
+        formElement = new fabric.Circle({
+          radius: 10,
+          fill: 'rgba(255, 255, 255, 0.8)',
+          stroke: '#000000',
+          strokeWidth: 1,
+          hasControls: true,
+          borderColor: '#2196F3',
+          cornerColor: '#2196F3',
+          data: { ...field }
+        });
+        break;
+        
+      case 'dropdown':
+        formElement = new fabric.Rect({
+          width: 200,
+          height: 40,
+          fill: 'rgba(255, 255, 255, 0.8)',
+          stroke: '#000000',
+          strokeWidth: 1,
+          hasControls: true,
+          borderColor: '#2196F3',
+          cornerColor: '#2196F3',
+          data: { ...field }
+        });
+        break;
+    }
+    
+    if (formElement) {
+      formElement.set({
+        left: 100,
+        top: 100,
+        cornerSize: 10,
+        transparentCorners: false
+      });
+      
+      canvas.add(formElement);
+      canvas.setActiveObject(formElement);
+      canvas.renderAll();
+    }
   };
 
   const handleAddField = () => {
@@ -72,6 +139,8 @@ const FormTool: React.FC<FormToolProps> = ({ document }) => {
     };
     
     setFormFields(prev => [...prev, field]);
+    addFormFieldToCanvas(field);
+    
     setNewField({
       id: '',
       type: 'text',
@@ -84,6 +153,12 @@ const FormTool: React.FC<FormToolProps> = ({ document }) => {
 
   const handleRemoveField = (id: string) => {
     setFormFields(prev => prev.filter(field => field.id !== id));
+    const objects = canvas.getObjects();
+    const fieldObject = objects.find(obj => obj.data?.id === id);
+    if (fieldObject) {
+      canvas.remove(fieldObject);
+      canvas.renderAll();
+    }
   };
 
   const handleAddOption = (fieldId: string) => {
@@ -119,11 +194,6 @@ const FormTool: React.FC<FormToolProps> = ({ document }) => {
       }
       return field;
     }));
-  };
-
-  const handleSaveForm = () => {
-    // In a real implementation, we would save the form structure to the PDF
-    console.log('Form structure:', formFields);
   };
 
   if (isLoading) {
@@ -220,10 +290,14 @@ const FormTool: React.FC<FormToolProps> = ({ document }) => {
             <Plus size={16} />
             Add Field
           </button>
+          
+          <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-md text-sm">
+            Drag and drop the form fields onto the PDF after adding them
+          </div>
         </div>
       )}
       
-      {formFields.length > 0 ? (
+      {formFields.length > 0 && (
         <div className="space-y-4">
           {formFields.map((field) => (
             <div key={field.id} className="p-4 bg-white rounded-lg border border-gray-200">
@@ -270,83 +344,15 @@ const FormTool: React.FC<FormToolProps> = ({ document }) => {
                   </button>
                 </div>
               )}
-              
-              {field.type === 'text' && (
-                <input
-                  type="text"
-                  value={field.value}
-                  onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                  placeholder={field.placeholder}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  required={field.required}
-                />
-              )}
-              
-              {field.type === 'checkbox' && (
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={field.value === 'true'}
-                    onChange={(e) => handleFieldChange(field.id, e.target.checked.toString())}
-                    className="mr-2"
-                    required={field.required}
-                  />
-                  <span className="text-sm text-gray-700">{field.name}</span>
-                </label>
-              )}
-              
-              {field.type === 'radio' && field.options && (
-                <div className="space-y-2">
-                  {field.options.map((option, index) => (
-                    <label key={index} className="flex items-center">
-                      <input
-                        type="radio"
-                        name={field.id}
-                        value={option}
-                        checked={field.value === option}
-                        onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                        className="mr-2"
-                        required={field.required}
-                      />
-                      <span className="text-sm text-gray-700">{option}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-              
-              {field.type === 'dropdown' && field.options && (
-                <select
-                  value={field.value}
-                  onChange={(e) => handleFieldChange(field.id, e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                  required={field.required}
-                >
-                  <option value="">Select an option</option>
-                  {field.options.map((option, index) => (
-                    <option key={index} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              )}
             </div>
           ))}
-          
-          <button
-            onClick={handleSaveForm}
-            className="flex items-center gap-2 w-full justify-center bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
-          >
-            <Save size={16} />
-            Save Form Structure
-          </button>
         </div>
-      ) : (
+      )}
+      
+      {!formFields.length && !showCreator && (
         <div className="text-center p-6 bg-gray-50 rounded-lg">
           <p className="text-gray-500">
-            {showCreator 
-              ? "Start by adding form fields above" 
-              : "No form fields yet. Click 'Show Creator' to add fields"
-            }
+            No form fields yet. Click 'Show Creator' to add fields
           </p>
         </div>
       )}

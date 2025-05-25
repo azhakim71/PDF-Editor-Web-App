@@ -26,7 +26,7 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [activeTool, setActiveTool] = useState<EditorTool>(null);
-  const [scale, setScale] = useState(1.0);
+  const [scale, setScale] = useState(0.5); // Set initial scale to 50%
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
@@ -115,18 +115,13 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
       setIsSaving(true);
       const pdfBlob = await savePDF(document, fabricCanvasRef.current, currentPage);
       
-      // Create a temporary URL for the blob
       const url = window.URL.createObjectURL(pdfBlob);
-      
-      // Create and trigger download
       const link = window.document.createElement('a');
       link.href = url;
       link.download = `edited_${document.name}`;
       window.document.body.appendChild(link);
       link.click();
       window.document.body.removeChild(link);
-      
-      // Clean up the URL
       window.URL.revokeObjectURL(url);
       setHasUnsavedChanges(false);
     } catch (error) {
@@ -175,7 +170,7 @@ const PDFEditor: React.FC<PDFEditorProps> = ({ document }) => {
       case 'highlight':
         return <HighlightTool canvas={fabricCanvasRef.current} />;
       case 'form':
-        return <FormTool document={document} />;
+        return <FormTool canvas={fabricCanvasRef.current} document={document} />;
       case 'compress':
         return <CompressTool document={document} />;
       default:

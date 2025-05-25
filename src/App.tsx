@@ -49,8 +49,38 @@ function App() {
         )}
       </main>
       
-      <footer className="py-4 border-t border-gray-200 text-center text-sm text-gray-500">
-        © {new Date().getFullYear()} PDF Editor - All rights reserved
+      <footer className="py-4 border-t border-gray-200">
+        <div className="container mx-auto px-4 flex flex-col items-center">
+          <p className="text-sm text-gray-500 mb-2">
+            © {new Date().getFullYear()} PDF Editor - Designed by Azizul
+          </p>
+          <div className="flex space-x-4">
+            <a
+              href="https://facebook.com/browserabbi"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              Facebook
+            </a>
+            <a
+              href="https://linkedin.com/in/azhakim"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              LinkedIn
+            </a>
+            <a
+              href="https://twitter.com/azhakim03"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:text-blue-800 transition-colors"
+            >
+              Twitter
+            </a>
+          </div>
+        </div>
       </footer>
     </div>
   );
