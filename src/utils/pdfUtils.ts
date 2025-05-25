@@ -67,7 +67,7 @@ export const savePDF = async (
 
   try {
     // Get the canvas as a high-resolution PNG
-    const scaleFactor = 2; // Increase resolution
+    const scaleFactor = 4; // Increase resolution for better quality
     const canvasDataUrl = fabricCanvas.toDataURL({
       format: 'png',
       quality: 1,
@@ -113,25 +113,37 @@ export const savePDF = async (
 export const renderPageToCanvas = async (
   pdfJsDoc: PDFDocumentProxy, 
   pageNumber: number, 
-  scale: number = 1.5
+  scale: number = 0.5
 ): Promise<HTMLCanvasElement> => {
   const page = await pdfJsDoc.getPage(pageNumber);
-  const viewport = page.getViewport({ scale: scale * 2 }); // Double the resolution
+  
+  // Calculate viewport with high DPI for better quality
+  const dpiScale = 2; // Increase DPI for better quality
+  const viewport = page.getViewport({ scale: scale * dpiScale });
   
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d', { alpha: false })!;
+  
+  // Set canvas size to match viewport
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   
-  // Set high-quality rendering
+  // Enable high-quality image rendering
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   
+  // Render the page with high quality settings
   await page.render({
     canvasContext: context,
     viewport,
-    intent: 'print', // Use print intent for higher quality
+    intent: 'display', // Use display intent for screen viewing
+    renderInteractiveForms: true,
+    enableWebGL: true,
   }).promise;
+  
+  // Scale down the canvas size for display while maintaining the high-resolution render
+  canvas.style.width = `${viewport.width / dpiScale}px`;
+  canvas.style.height = `${viewport.height / dpiScale}px`;
   
   return canvas;
 };
