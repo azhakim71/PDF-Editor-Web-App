@@ -1,4 +1,4 @@
-import { PDFDocument as PDFLibDocument } from 'pdf-lib';
+import { PDFDocument as PDFLibDocument, PDFName, PDFDict, PDFStream, PDFNumber } from 'pdf-lib';
 import { getDocument, PDFDocumentProxy } from 'pdfjs-dist';
 import { PDFDocument, CompressionSettings } from '../types';
 import { fabric } from 'fabric';
@@ -48,16 +48,16 @@ export const compressPDF = async (
     const { width, height } = page.getSize();
     
     // Scale down images based on quality setting
-    const images = await page.node.Resources().lookup(PDFLibDocument.PDFName.of('XObject'), PDFLibDocument.PDFDict);
+    const images = await page.node.Resources().lookup(PDFName.of('XObject'), PDFDict);
     if (images) {
       for (const [name, xObject] of Object.entries(images.dict)) {
-        if (xObject instanceof PDFLibDocument.PDFStream) {
-          const imageData = await xObject.fetch(PDFLibDocument.PDFStream);
-          if (imageData && imageData.dict.get(PDFLibDocument.PDFName.of('Subtype')) === PDFLibDocument.PDFName.of('Image')) {
+        if (xObject instanceof PDFStream) {
+          const imageData = await xObject.fetch(PDFStream);
+          if (imageData && imageData.dict.get(PDFName.of('Subtype')) === PDFName.of('Image')) {
             // Apply compression based on quality setting
-            imageData.dict.set(PDFLibDocument.PDFName.of('Filter'), PDFLibDocument.PDFName.of('DCTDecode'));
-            imageData.dict.set(PDFLibDocument.PDFName.of('ColorSpace'), PDFLibDocument.PDFName.of('DeviceRGB'));
-            imageData.dict.set(PDFLibDocument.PDFName.of('BitsPerComponent'), PDFLibDocument.PDFNumber.of(8));
+            imageData.dict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
+            imageData.dict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
+            imageData.dict.set(PDFName.of('BitsPerComponent'), PDFNumber.of(8));
           }
         }
       }
