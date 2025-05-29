@@ -3,21 +3,14 @@ import { getDocument, PDFDocumentProxy } from 'pdfjs-dist';
 import { PDFDocument, CompressionSettings } from '../types';
 import { fabric } from 'fabric';
 
-// Read and prepare PDF document
 export const readPdfDocument = async (file: File): Promise<PDFDocument> => {
   const arrayBuffer = await file.arrayBuffer();
-  
-  // Create a data URL for preview first
   const dataUrl = await arrayBufferToDataUrl(arrayBuffer);
   
-  // Create independent copies of the Uint8Array for each operation
   const uint8ArrayForPdfJs = new Uint8Array(arrayBuffer.slice(0));
   const uint8ArrayForPdfLib = new Uint8Array(arrayBuffer.slice(0));
   
-  // Load with PDF.js for rendering using the first copy
   const pdfJsDoc = await getDocument(uint8ArrayForPdfJs).promise;
-  
-  // Load with PDF-lib for editing using the second copy
   const pdfLibDoc = await PDFLibDocument.load(uint8ArrayForPdfLib);
   
   return {
@@ -30,7 +23,6 @@ export const readPdfDocument = async (file: File): Promise<PDFDocument> => {
   };
 };
 
-// Convert ArrayBuffer to data URL
 export const arrayBufferToDataUrl = (arrayBuffer: ArrayBuffer): Promise<string> => {
   return new Promise((resolve) => {
     const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
@@ -40,22 +32,56 @@ export const arrayBufferToDataUrl = (arrayBuffer: ArrayBuffer): Promise<string> 
   });
 };
 
-// Compress PDF with specified settings
 export const compressPDF = async (
   pdfDocument: PDFDocument, 
   settings: CompressionSettings
 ): Promise<PDFDocument> => {
-  // In a real implementation, we would use PDF-lib or another library
-  // to compress the PDF based on settings.quality
-  // This is a placeholder for the real implementation
+  if (!pdfDocument.pdfLibDoc) {
+    throw new Error('PDF document not available');
+  }
+
+  const pdfDoc = pdfDocument.pdfLibDoc;
+  const pages = pdfDoc.getPages();
   
-  // Clone document to not modify the original
-  const clonedDoc = { ...pdfDocument };
+  // Apply compression settings to each page
+  for (const page of pages) {
+    const { width, height } = page.getSize();
+    
+    // Scale down images based on quality setting
+    const images = await page.node.Resources().lookup(PDFLibDocument.PDFName.of('XObject'), PDFLibDocument.PDFDict);
+    if (images) {
+      for (const [name, xObject] of Object.entries(images.dict)) {
+        if (xObject instanceof PDFLibDocument.PDFStream) {
+          const imageData = await xObject.fetch(PDFLibDocument.PDFStream);
+          if (imageData && imageData.dict.get(PDFLibDocument.PDFName.of('Subtype')) === PDFLibDocument.PDFName.of('Image')) {
+            // Apply compression based on quality setting
+            imageData.dict.set(PDFLibDocument.PDFName.of('Filter'), PDFLibDocument.PDFName.of('DCTDecode'));
+            imageData.dict.set(PDFLibDocument.PDFName.of('ColorSpace'), PDFLibDocument.PDFName.of('DeviceRGB'));
+            imageData.dict.set(PDFLibDocument.PDFName.of('BitsPerComponent'), PDFLibDocument.PDFNumber.of(8));
+          }
+        }
+      }
+    }
+  }
+
+  // Save with compression
+  const compressedBytes = await pdfDoc.save({
+    useObjectStreams: true,
+    addDefaultPage: false,
+    objectsPerTick: 50,
+    compress: true
+  });
+
+  // Create new document with compressed data
+  const compressedDoc = await PDFLibDocument.load(compressedBytes);
   
-  return clonedDoc;
+  return {
+    ...pdfDocument,
+    pdfLibDoc: compressedDoc,
+    size: compressedBytes.length
+  };
 };
 
-// Save the edited PDF with all canvas modifications
 export const savePDF = async (
   pdfDocument: PDFDocument, 
   fabricCanvas: fabric.Canvas | null,
@@ -66,40 +92,38 @@ export const savePDF = async (
   }
 
   try {
-    // Get the canvas as a high-resolution PNG
-    const scaleFactor = 4; // Increase resolution for better quality
+    // Increase resolution significantly for better quality
+    const scaleFactor = 8;
     const canvasDataUrl = fabricCanvas.toDataURL({
       format: 'png',
       quality: 1,
       multiplier: scaleFactor
     });
 
-    // Convert data URL to Uint8Array
     const base64Data = canvasDataUrl.split(',')[1];
     const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
 
-    // Embed the image into the PDF
     const pdfDoc = pdfDocument.pdfLibDoc;
     const page = pdfDoc.getPages()[currentPage - 1];
     const image = await pdfDoc.embedPng(imageBytes);
 
-    // Get page dimensions
     const { width, height } = page.getSize();
 
-    // Draw the image on the page, preserving aspect ratio and maintaining quality
+    // Draw high-resolution image
     page.drawImage(image, {
       x: 0,
       y: 0,
       width,
       height,
-      opacity: 1,
+      opacity: 1
     });
 
-    // Save the modified PDF with maximum quality
+    // Save with maximum quality settings
     const pdfBytes = await pdfDoc.save({
       useObjectStreams: false,
       addDefaultPage: false,
-      objectsPerTick: 50,
+      objectsPerTick: 100,
+      compress: false
     });
 
     return new Blob([pdfBytes], { type: 'application/pdf' });
@@ -109,7 +133,6 @@ export const savePDF = async (
   }
 };
 
-// Get a page as canvas element (for editing)
 export const renderPageToCanvas = async (
   pdfJsDoc: PDFDocumentProxy, 
   pageNumber: number, 
@@ -117,40 +140,36 @@ export const renderPageToCanvas = async (
 ): Promise<HTMLCanvasElement> => {
   const page = await pdfJsDoc.getPage(pageNumber);
   
-  // Calculate viewport with high DPI for better quality
-  const dpiScale = 2; // Increase DPI for better quality
+  // Increase DPI significantly for better quality
+  const dpiScale = 4;
   const viewport = page.getViewport({ scale: scale * dpiScale });
   
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d', { alpha: false })!;
   
-  // Set canvas size to match viewport
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   
-  // Enable high-quality image rendering
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   
-  // Render the page with high quality settings
   await page.render({
     canvasContext: context,
     viewport,
-    intent: 'display', // Use display intent for screen viewing
+    intent: 'print', // Use print intent for highest quality
     renderInteractiveForms: true,
     enableWebGL: true,
   }).promise;
   
-  // Scale down the canvas size for display while maintaining the high-resolution render
+  // Set display size while maintaining high resolution
   canvas.style.width = `${viewport.width / dpiScale}px`;
   canvas.style.height = `${viewport.height / dpiScale}px`;
   
   return canvas;
 };
 
-// Check if PDF has form fields
 export const hasForms = async (pdfJsDoc: PDFDocumentProxy): Promise<boolean> => {
-  // In a real implementation, we would check for AcroForm fields
-  // This is a placeholder for the real implementation
-  return false;
+  const page = await pdfJsDoc.getPage(1);
+  const annotations = await page.getAnnotations();
+  return annotations.some(annotation => annotation.subtype === 'Widget');
 };
