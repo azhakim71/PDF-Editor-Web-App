@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { PDFDocument, CompressionSettings } from '../../types';
-import { compressPDF, savePDF } from '../../utils/pdfUtils';
+import { compressPDF } from '../../utils/pdfUtils';
 
 interface CompressToolProps {
   document: PDFDocument;
 }
 
 const CompressTool: React.FC<CompressToolProps> = ({ document }) => {
-  const [targetSize, setTargetSize] = useState(100); // Default target size in KB
-  const [quality, setQuality] = useState(90); // Default quality 0-100
+  const [targetSize, setTargetSize] = useState(100);
+  const [quality, setQuality] = useState(90);
   const [isCompressing, setIsCompressing] = useState(false);
   const [compressedSize, setCompressedSize] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   const originalSizeKB = Math.round(document.size / 1024);
 
@@ -20,28 +21,19 @@ const CompressTool: React.FC<CompressToolProps> = ({ document }) => {
     try {
       setIsCompressing(true);
       setCompressedSize(null);
+      setError(null);
       
-      // Convert quality to 0-1 range
       const settings: CompressionSettings = {
         targetSize,
         quality: quality / 100
       };
       
       const compressedDoc = await compressPDF(document, settings);
+      setCompressedSize(Math.round(compressedDoc.size / 1024));
       
-      // In a real implementation, we would actually compress the PDF
-      // This is a placeholder that simulates compression
-      const simulatedCompressedSize = Math.max(
-        document.size * (settings.quality * 0.8),
-        document.size * 0.1
-      );
-      
-      setCompressedSize(Math.round(simulatedCompressedSize / 1024));
-      
-      // Save the compressed PDF
-      await savePDF(compressedDoc);
-    } catch (error) {
-      console.error('Error compressing PDF:', error);
+    } catch (err) {
+      console.error('Error compressing PDF:', err);
+      setError('Failed to compress the PDF. You can still download the original file.');
     } finally {
       setIsCompressing(false);
     }
@@ -60,7 +52,7 @@ const CompressTool: React.FC<CompressToolProps> = ({ document }) => {
           <span className="text-sm font-medium">Original Size:</span>
           <span className="text-sm">{originalSizeKB} KB</span>
         </div>
-        {compressedSize && (
+        {compressedSize && !error && (
           <>
             <div className="flex justify-between mt-1">
               <span className="text-sm font-medium">Compressed Size:</span>
@@ -115,6 +107,12 @@ const CompressTool: React.FC<CompressToolProps> = ({ document }) => {
         </div>
       </div>
       
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md text-sm text-red-600">
+          {error}
+        </div>
+      )}
+      
       <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-600">
         <p>
           Higher quality results in larger file sizes. Lower quality may affect readability and image clarity.
@@ -124,7 +122,7 @@ const CompressTool: React.FC<CompressToolProps> = ({ document }) => {
       <button
         onClick={handleCompress}
         disabled={isCompressing}
-        className="w-full py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed"
+        className="w-full py-2 bg-blue-600 text-white rounded-lg disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-700 transition-colors"
       >
         {isCompressing ? (
           <div className="flex items-center justify-center">
