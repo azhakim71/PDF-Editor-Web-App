@@ -59,7 +59,7 @@ export const compressPDF = async (
         if (xObject instanceof PDFStream) {
           const imageData = await xObject.fetch(PDFStream);
           if (imageData && imageData.dict.get(PDFName.of('Subtype')) === PDFName.of('Image')) {
-            // Preserve image quality while optimizing size
+            // Preserve maximum image quality
             imageData.dict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
             imageData.dict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
             imageData.dict.set(PDFName.of('BitsPerComponent'), PDFNumber.of(8));
@@ -68,12 +68,12 @@ export const compressPDF = async (
       }
     }
 
-    // Save with high-quality settings
+    // Save with maximum quality settings
     const compressedBytes = await pdfDoc.save({
-      useObjectStreams: true,
+      useObjectStreams: false,
       addDefaultPage: false,
-      objectsPerTick: 100,
-      compress: false // Disable compression to maintain quality
+      objectsPerTick: 150,
+      compress: false // Disable compression for maximum quality
     });
 
     // Create new document with optimized data
@@ -100,8 +100,8 @@ export const savePDF = async (
   }
 
   try {
-    // Use maximum resolution for output
-    const scaleFactor = 8; // Increased for maximum quality
+    // Use ultra-high resolution for output (1500% quality)
+    const scaleFactor = 15;
     const canvasDataUrl = fabricCanvas.toDataURL({
       format: 'png',
       quality: 1,
@@ -117,7 +117,7 @@ export const savePDF = async (
 
     const { width, height } = page.getSize();
 
-    // Draw high-resolution image
+    // Draw ultra-high resolution image
     page.drawImage(image, {
       x: 0,
       y: 0,
@@ -130,7 +130,7 @@ export const savePDF = async (
     const pdfBytes = await pdfDoc.save({
       useObjectStreams: false,
       addDefaultPage: false,
-      objectsPerTick: 100,
+      objectsPerTick: 150,
       compress: false // Disable compression for maximum quality
     });
 
@@ -144,12 +144,12 @@ export const savePDF = async (
 export const renderPageToCanvas = async (
   pdfJsDoc: PDFDocumentProxy, 
   pageNumber: number, 
-  scale: number = 0.5 // Default scale is 50%
+  scale: number = 0.5 // Display at 50% scale
 ): Promise<HTMLCanvasElement> => {
   const page = await pdfJsDoc.getPage(pageNumber);
   
-  // Increase DPI significantly for better quality
-  const dpiScale = 4; // Increased DPI multiplier for better quality
+  // Use high DPI for better quality even at 50% scale
+  const dpiScale = 8;
   const viewport = page.getViewport({ scale: scale * dpiScale });
   
   const canvas = document.createElement('canvas');
@@ -159,11 +159,11 @@ export const renderPageToCanvas = async (
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   
-  // Enable high-quality rendering
+  // Enable maximum quality rendering
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   
-  // Render with high-quality settings
+  // Render with maximum quality settings
   await page.render({
     canvasContext: context,
     viewport,
@@ -172,7 +172,7 @@ export const renderPageToCanvas = async (
     enableWebGL: true,
   }).promise;
   
-  // Set display size while maintaining high resolution
+  // Set display size to 50% while maintaining high resolution
   canvas.style.width = `${viewport.width / dpiScale}px`;
   canvas.style.height = `${viewport.height / dpiScale}px`;
   
