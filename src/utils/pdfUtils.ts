@@ -144,12 +144,12 @@ export const savePDF = async (
 export const renderPageToCanvas = async (
   pdfJsDoc: PDFDocumentProxy, 
   pageNumber: number, 
-  scale: number = 0.5 // Display at 50% scale
+  scale: number = 1 // Display at normal size
 ): Promise<HTMLCanvasElement> => {
   const page = await pdfJsDoc.getPage(pageNumber);
   
-  // Use high DPI for better quality even at 50% scale
-  const dpiScale = 8;
+  // Use high DPI for better quality
+  const dpiScale = 2;
   const viewport = page.getViewport({ scale: scale * dpiScale });
   
   const canvas = document.createElement('canvas');
@@ -172,7 +172,7 @@ export const renderPageToCanvas = async (
     enableWebGL: true,
   }).promise;
   
-  // Set display size to 50% while maintaining high resolution
+  // Set display size to actual size while maintaining high resolution
   canvas.style.width = `${viewport.width / dpiScale}px`;
   canvas.style.height = `${viewport.height / dpiScale}px`;
   
