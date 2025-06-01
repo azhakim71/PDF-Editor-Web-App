@@ -43,13 +43,18 @@ export const compressPDF = async (
   const pdfDoc = pdfDocument.pdfLibDoc;
   const pages = pdfDoc.getPages();
   
-  // Apply compression settings to each page
-  for (const page of pages) {
-    const { width, height } = page.getSize();
-    
-    // Scale down images based on quality setting
-    const images = await page.node.Resources().lookup(PDFName.of('XObject'), PDFDict);
-    if (images) {
+  try {
+    // Apply compression settings to each page
+    for (const page of pages) {
+      const { width, height } = page.getSize();
+      
+      // Scale down images based on quality setting
+      const resources = page.node.Resources();
+      if (!resources) continue;
+
+      const images = await resources.lookup(PDFName.of('XObject'), PDFDict);
+      if (!images || !(images instanceof PDFDict)) continue;
+
       for (const [name, xObject] of Object.entries(images.dict)) {
         if (xObject instanceof PDFStream) {
           const imageData = await xObject.fetch(PDFStream);
@@ -62,24 +67,27 @@ export const compressPDF = async (
         }
       }
     }
+
+    // Save with compression
+    const compressedBytes = await pdfDoc.save({
+      useObjectStreams: true,
+      addDefaultPage: false,
+      objectsPerTick: 50,
+      compress: true
+    });
+
+    // Create new document with compressed data
+    const compressedDoc = await PDFLibDocument.load(compressedBytes);
+    
+    return {
+      ...pdfDocument,
+      pdfLibDoc: compressedDoc,
+      size: compressedBytes.length
+    };
+  } catch (error) {
+    console.error('Error in compression:', error);
+    throw new Error('Failed to compress PDF: Invalid or unsupported PDF structure');
   }
-
-  // Save with compression
-  const compressedBytes = await pdfDoc.save({
-    useObjectStreams: true,
-    addDefaultPage: false,
-    objectsPerTick: 50,
-    compress: true
-  });
-
-  // Create new document with compressed data
-  const compressedDoc = await PDFLibDocument.load(compressedBytes);
-  
-  return {
-    ...pdfDocument,
-    pdfLibDoc: compressedDoc,
-    size: compressedBytes.length
-  };
 };
 
 export const savePDF = async (
@@ -93,7 +101,7 @@ export const savePDF = async (
 
   try {
     // Increase resolution significantly for better quality
-    const scaleFactor = 8;
+    const scaleFactor = 4; // Increased for better quality
     const canvasDataUrl = fabricCanvas.toDataURL({
       format: 'png',
       quality: 1,
@@ -136,23 +144,26 @@ export const savePDF = async (
 export const renderPageToCanvas = async (
   pdfJsDoc: PDFDocumentProxy, 
   pageNumber: number, 
-  scale: number = 0.5
+  scale: number = 0.5 // Default scale is 50%
 ): Promise<HTMLCanvasElement> => {
   const page = await pdfJsDoc.getPage(pageNumber);
   
   // Increase DPI significantly for better quality
-  const dpiScale = 4;
+  const dpiScale = 2; // Base DPI multiplier
   const viewport = page.getViewport({ scale: scale * dpiScale });
   
   const canvas = document.createElement('canvas');
   const context = canvas.getContext('2d', { alpha: false })!;
   
+  // Set canvas dimensions to high resolution
   canvas.width = viewport.width;
   canvas.height = viewport.height;
   
+  // Enable high-quality rendering
   context.imageSmoothingEnabled = true;
   context.imageSmoothingQuality = 'high';
   
+  // Render with high-quality settings
   await page.render({
     canvasContext: context,
     viewport,
