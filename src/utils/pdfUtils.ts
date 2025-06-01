@@ -59,7 +59,7 @@ export const compressPDF = async (
         if (xObject instanceof PDFStream) {
           const imageData = await xObject.fetch(PDFStream);
           if (imageData && imageData.dict.get(PDFName.of('Subtype')) === PDFName.of('Image')) {
-            // Apply compression based on quality setting
+            // Preserve image quality while optimizing size
             imageData.dict.set(PDFName.of('Filter'), PDFName.of('DCTDecode'));
             imageData.dict.set(PDFName.of('ColorSpace'), PDFName.of('DeviceRGB'));
             imageData.dict.set(PDFName.of('BitsPerComponent'), PDFNumber.of(8));
@@ -68,15 +68,15 @@ export const compressPDF = async (
       }
     }
 
-    // Save with compression
+    // Save with high-quality settings
     const compressedBytes = await pdfDoc.save({
       useObjectStreams: true,
       addDefaultPage: false,
-      objectsPerTick: 50,
-      compress: true
+      objectsPerTick: 100,
+      compress: false // Disable compression to maintain quality
     });
 
-    // Create new document with compressed data
+    // Create new document with optimized data
     const compressedDoc = await PDFLibDocument.load(compressedBytes);
     
     return {
@@ -100,8 +100,8 @@ export const savePDF = async (
   }
 
   try {
-    // Increase resolution significantly for better quality
-    const scaleFactor = 4; // Increased for better quality
+    // Use maximum resolution for output
+    const scaleFactor = 8; // Increased for maximum quality
     const canvasDataUrl = fabricCanvas.toDataURL({
       format: 'png',
       quality: 1,
@@ -131,7 +131,7 @@ export const savePDF = async (
       useObjectStreams: false,
       addDefaultPage: false,
       objectsPerTick: 100,
-      compress: false
+      compress: false // Disable compression for maximum quality
     });
 
     return new Blob([pdfBytes], { type: 'application/pdf' });
@@ -149,7 +149,7 @@ export const renderPageToCanvas = async (
   const page = await pdfJsDoc.getPage(pageNumber);
   
   // Increase DPI significantly for better quality
-  const dpiScale = 2; // Base DPI multiplier
+  const dpiScale = 4; // Increased DPI multiplier for better quality
   const viewport = page.getViewport({ scale: scale * dpiScale });
   
   const canvas = document.createElement('canvas');
